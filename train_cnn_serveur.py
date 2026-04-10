@@ -20,7 +20,6 @@ PATCHES_TE = DATA / 'SatelitePatches/PA-test'
 WORK_DIR   = Path('/home/grp4')
 WORK_DIR.mkdir(parents=True, exist_ok=True)
 
-# GPU3 uniquement
 os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Device: {device}')
@@ -78,11 +77,6 @@ def load_all_patches(survey_ids, patches_dir, desc=''):
             print(f'  {desc} {i+1}/{n} | {elapsed/60:.1f}min | ~{remaining/60:.1f}min restantes | manquantes: {missing}')
     print(f'{desc}: {n-missing}/{n} images en {(time.time()-t0)/60:.1f}min')
     return arr
-
-# Test path
-sid0 = train_labels['surveyId'].iloc[0]
-p0   = get_patch_path(sid0, PATCHES_TR)
-print(f'Path exemple: {p0} | Existe: {p0.exists()}')
 
 all_tr_ids = train_labels['surveyId'].values
 test_ids   = pa_test['surveyId'].unique()
@@ -157,14 +151,14 @@ class ResNet18_4ch(nn.Module):
 model = ResNet18_4ch(NUM_CLASSES).to(device)
 print(f'Parametres: {sum(p.numel() for p in model.parameters()):,}')
 
-# ─── ENTRAINEMENT ─────────────────────────────────────────────────────────────
+# ─── ENTRAINEMENT 50 EPOCHS ───────────────────────────────────────────────────
 criterion  = nn.BCEWithLogitsLoss()
 optimizer  = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
-scheduler  = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=20)
+scheduler  = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=50)
 scaler     = GradScaler()
 CHECKPOINT = WORK_DIR / 'best_cnn_model.pt'
 
-NUM_EPOCHS   = 20
+NUM_EPOCHS   = 50
 best_f_score = 0.0
 t_start      = time.time()
 
@@ -207,9 +201,7 @@ for epoch in range(NUM_EPOCHS):
         pred_set = set(above)
         true_set = set(np.where(val_true[i] == 1)[0])
         tp = len(pred_set & true_set)
-        if tp == 0:
-            f_scores.append(0.0)
-            continue
+        if tp == 0: f_scores.append(0.0); continue
         p = tp / len(pred_set)
         r = tp / len(true_set)
         f_scores.append(2*p*r/(p+r))
@@ -226,7 +218,7 @@ for epoch in range(NUM_EPOCHS):
     if avg_f > best_f_score:
         best_f_score = avg_f
         torch.save(model.state_dict(), CHECKPOINT)
-        print(f'  Meilleur modele sauvegarde (F={avg_f:.4f}) -> {CHECKPOINT}')
+        print(f'  Meilleur modele sauvegarde (F={avg_f:.4f})')
 
     scheduler.step()
 
@@ -245,9 +237,9 @@ with torch.no_grad():
 
 test_probs_all = np.vstack(test_probs_all)
 np.save(WORK_DIR / 'cnn_test_probs.npy', test_probs_all)
-print(f'Predictions test: {test_probs_all.shape}')
+print(f'Predictions test: {test_probs_all.shape} | Sauvegarde: {WORK_DIR}/cnn_test_probs.npy')
 
-# ─── SOUMISSION ───────────────────────────────────────────────────────────────
+# ─── SOUMISSION CNN ───────────────────────────────────────────────────────────
 predictions = []
 for i in range(len(test_probs_all)):
     probs = test_probs_all[i]
@@ -260,4 +252,4 @@ for i in range(len(test_probs_all)):
 
 sub_path = WORK_DIR / 'submission_cnn_serveur.csv'
 pd.DataFrame({'surveyId': test_ids, 'predictions': predictions}).to_csv(sub_path, index=False)
-print(f'Soumission sauvegardee: {sub_path}')
+print(f'Soumission CNN sauvegardee: {sub_path}')
