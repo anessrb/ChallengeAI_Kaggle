@@ -308,7 +308,7 @@ def compare_locations(lat1: float, lon1: float, lat2: float, lon2: float, top_k:
 
 # ─── LANCEMENT ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    print("Serveur MCP GeoLifeCLEF démarré !")
+    print("Serveur MCP GeoLifeCLEF démarré sur http://localhost:8080")
     print("Tools disponibles:")
     print("  ✓ predict_species(lat, lon, top_k)")
     print("  ✓ get_species_info(species_id)")
@@ -317,4 +317,4 @@ if __name__ == "__main__":
     print("  ○ predict_species_cnn         [FUTUR]")
     print("  ○ explain_prediction          [FUTUR]")
     print("  ○ compare_locations           [FUTUR]")
-    mcp.run()
+    mcp.run(transport="sse", host="0.0.0.0", port=8080)
